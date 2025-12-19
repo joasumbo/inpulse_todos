@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Contact } from '../lib/supabase';
-import { Mail, Phone, MessageSquare, Check, Loader, Eye } from 'lucide-react';
+import { Mail, Phone, Check, Loader, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

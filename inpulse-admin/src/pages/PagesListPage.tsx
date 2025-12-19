@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Page } from '../lib/supabase';
-import { Plus, Edit, Eye, EyeOff, Loader } from 'lucide-react';
+import { Plus, Edit, Eye, EyeOff } from 'lucide-react';
 import { TableSkeleton } from '../components/Skeleton';
 
 export function PagesListPage() {

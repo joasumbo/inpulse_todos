@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { BlogPost } from '../lib/supabase';
-import { Plus, Edit, Eye, EyeOff, Loader } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
 import { Skeleton } from '../components/Skeleton';
 
 export function BlogListPage() {
