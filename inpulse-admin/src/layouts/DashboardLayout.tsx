@@ -18,9 +18,10 @@ const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
   { icon: Palette, label: 'Aparência', path: '/appearance' },
+  { icon: FileText, label: 'Home', path: '/home-content' },
   { icon: FileText, label: 'Páginas', path: '/pages' },
   { icon: Newspaper, label: 'Blog', path: '/blog' },
-  { icon: MenuIcon, label: 'Menu & Navegação', path: '/menu' },
+  { icon: MenuIcon, label: 'Menu', path: '/menu' },
   { icon: Share2, label: 'Redes Sociais', path: '/social' },
   { icon: MessageSquare, label: 'Contatos', path: '/contacts' },
 ];

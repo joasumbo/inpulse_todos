@@ -12,6 +12,7 @@ import { BlogListPage } from './pages/BlogListPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
 import { MenuPage } from './pages/MenuPage';
 import { SocialPage } from './pages/SocialPage';
+import { HomeContentPage } from './pages/HomeContentPage';
 import { ContactsPage } from './pages/ContactsPage';
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="appearance" element={<AppearancePage />} />
+            <Route path="home-content" element={<HomeContentPage />} />
             <Route path="pages" element={<PagesListPage />} />
             <Route path="pages/:id" element={<PageEditorPage />} />
             <Route path="blog" element={<BlogListPage />} />
