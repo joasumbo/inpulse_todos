@@ -14,6 +14,7 @@ import { MenuPage } from './pages/MenuPage';
 import { SocialPage } from './pages/SocialPage';
 import { HomeContentPage } from './pages/HomeContentPage';
 import { ContactsPage } from './pages/ContactsPage';
+import { MyDayQRPage } from './pages/MyDayQRPage';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="menu" element={<MenuPage />} />
             <Route path="social" element={<SocialPage />} />
             <Route path="contacts" element={<ContactsPage />} />
+            <Route path="myday-qr" element={<MyDayQRPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

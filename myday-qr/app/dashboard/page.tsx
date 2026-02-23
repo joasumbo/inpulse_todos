@@ -201,10 +201,13 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">MyDay QR</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500 hidden sm:block">{user.email}</span>
+            <span className="text-sm text-gray-600 hidden sm:block font-medium">
+              {user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0]}
+            </span>
             <button
               onClick={handleLogout}
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Sair"
             >
               <LogOut size={20} />
             </button>
@@ -242,19 +245,21 @@ export default function DashboardPage() {
 
           {/* Preview do novo QR */}
           {newQrImage && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg flex items-center gap-4 animate-fade-in">
-              <img src={newQrImage} alt="QR Code" className="w-24 h-24 rounded-lg" />
-              <div>
-                <p className="text-green-600 font-medium flex items-center gap-1">
-                  <Check size={16} /> QR Code criado com sucesso!
+            <div className="mt-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex flex-col sm:flex-row items-center gap-6 animate-fade-in border border-gray-200">
+              <div className="bg-white p-3 rounded-xl shadow-sm">
+                <img src={newQrImage} alt="QR Code" className="w-40 h-40 sm:w-48 sm:h-48 rounded-lg" />
+              </div>
+              <div className="text-center sm:text-left flex-1">
+                <p className="text-green-600 font-semibold text-lg flex items-center justify-center sm:justify-start gap-2">
+                  <Check size={20} /> QR Code criado com sucesso!
                 </p>
-                <p className="text-sm text-gray-500">Já podes partilhar ou imprimir</p>
+                <p className="text-gray-500 mt-1">Já podes partilhar ou imprimir</p>
               </div>
               <button
                 onClick={() => setNewQrImage('')}
-                className="ml-auto p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                className="absolute top-2 right-2 sm:relative sm:top-auto sm:right-auto p-2 hover:bg-gray-200 rounded-lg transition-colors"
               >
-                <X size={18} className="text-gray-400" />
+                <X size={20} className="text-gray-400" />
               </button>
             </div>
           )}

@@ -11,6 +11,7 @@ import {
   LogOut,
   Palette,
   Share2,
+  QrCode,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -24,6 +25,7 @@ const menuItems = [
   { icon: MenuIcon, label: 'Menu', path: '/menu' },
   { icon: Share2, label: 'Redes Sociais', path: '/social' },
   { icon: MessageSquare, label: 'Contatos', path: '/contacts' },
+  { icon: QrCode, label: 'MyDay QR', path: '/myday-qr' },
 ];
 
 export function DashboardLayout() {
