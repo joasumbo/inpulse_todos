@@ -72,6 +72,13 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   const [imagemUrl, setImagemUrl]     = useState('')
   const [uploadingImg, setUploadingImg] = useState(false)
 
+  // Edição de comentário/foto de uma ação já concluída
+  const [editId, setEditId]             = useState<string | null>(null)
+  const [editDesc, setEditDesc]         = useState('')
+  const [editImg, setEditImg]           = useState('')
+  const [editUploading, setEditUploading] = useState(false)
+  const [savingEdit, setSavingEdit]     = useState(false)
+
   const [historico, setHistorico]       = useState<Jornada[]>([])
   const [jornadaAberta, setJAberta]     = useState<string | null>(null)
   const [acoesHist, setAcoesHist]       = useState<Record<string, Acao[]>>({})
@@ -209,6 +216,51 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     } finally {
       setUploadingImg(false)
       e.target.value = ''
+    }
+  }
+
+  // --- Edição de comentário/foto de uma ação já concluída ---
+  function abrirEdicao(a: Acao) {
+    setEditId(a.id)
+    setEditDesc(a.descricao ?? '')
+    setEditImg(a.imagem_url ?? '')
+  }
+
+  function cancelarEdicao() {
+    setEditId(null)
+    setEditDesc('')
+    setEditImg('')
+  }
+
+  async function handleEditImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !jornada) return
+    setEditUploading(true)
+    try {
+      const url = await uploadImagem(file, jornada.id)
+      if (url) setEditImg(url)
+    } finally {
+      setEditUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function guardarEdicao(a: Acao) {
+    if (!jornada) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch(`/api/admin/jornadas/${jornada.id}/acoes/${a.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descricao: editDesc || null, imagem_url: editImg || null }),
+      })
+      if (res.ok) {
+        const atualizada: Acao = await res.json()
+        setAcoes(prev => prev.map(x => x.id === atualizada.id ? atualizada : x))
+        cancelarEdicao()
+      }
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -442,11 +494,72 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                         <p className="text-xs" style={{ color: 'var(--text-3)' }}>
                           {formatHora(a.inicio)} → {a.fim ? formatHora(a.fim) : '...'}
                         </p>
-                        {a.descricao && <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>{a.descricao}</p>}
-                        {a.imagem_url && (
-                          <a href={a.imagem_url} target="_blank" rel="noreferrer">
-                            <img src={a.imagem_url} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />
-                          </a>
+
+                        {editId === a.id ? (
+                          /* Editor inline de comentário + foto */
+                          <div className="mt-2 space-y-2">
+                            <textarea
+                              value={editDesc}
+                              onChange={e => setEditDesc(e.target.value)}
+                              placeholder="Comentário..."
+                              rows={2}
+                              className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+                              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-1)' }}
+                            />
+                            <label
+                              className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl cursor-pointer"
+                              style={{ background: 'var(--bg-card)', color: m.cor }}
+                            >
+                              {editUploading
+                                ? <><Loader2 size={13} className="animate-spin" /> A carregar...</>
+                                : editImg
+                                  ? <><CheckCircle2 size={13} /> Foto adicionada — substituir</>
+                                  : <><Camera size={13} /> Tirar / escolher foto</>}
+                              <input type="file" accept="image/*" className="hidden" onChange={handleEditImage} />
+                            </label>
+                            {editImg && (
+                              <img src={editImg} alt="preview" className="rounded-xl max-h-28 object-cover" />
+                            )}
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => guardarEdicao(a)}
+                                disabled={savingEdit || editUploading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold"
+                                style={{ background: m.cor, color: '#fff', opacity: (savingEdit || editUploading) ? 0.7 : 1 }}
+                              >
+                                {savingEdit ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelarEdicao}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                                style={{ background: 'var(--bg-card)', color: 'var(--text-2)' }}
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {a.descricao && <p className="text-xs mt-1" style={{ color: 'var(--text-2)' }}>{a.descricao}</p>}
+                            {a.imagem_url && (
+                              <a href={a.imagem_url} target="_blank" rel="noreferrer">
+                                <img src={a.imagem_url} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />
+                              </a>
+                            )}
+                            {(!isViewingOther || isAdmin) && (
+                              <button
+                                type="button"
+                                onClick={() => abrirEdicao(a)}
+                                className="mt-1.5 text-xs font-medium"
+                                style={{ color: 'var(--accent)' }}
+                              >
+                                {a.descricao || a.imagem_url ? 'Editar comentário / foto' : 'Adicionar comentário / foto'}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
