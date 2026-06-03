@@ -49,7 +49,11 @@ export default function UtilizadorModal({ utilizador, onClose, onSaved }: Props)
     try {
       const method = isEdicao ? 'PATCH' : 'POST'
       const body = isEdicao
-        ? { id: utilizador!.id, nome: form.nome, telefone: form.telefone, cargo: form.cargo, notas: form.notas, ativo: form.ativo }
+        ? {
+            id: utilizador!.id, nome: form.nome, username: form.username,
+            telefone: form.telefone, cargo: form.cargo, notas: form.notas, ativo: form.ativo,
+            ...(form.password ? { password: form.password } : {}),
+          }
         : { nome: form.nome, username: form.username, password: form.password, telefone: form.telefone, cargo: form.cargo, notas: form.notas }
 
       const res  = await fetch('/api/admin/utilizadores', {
@@ -109,41 +113,31 @@ export default function UtilizadorModal({ utilizador, onClose, onSaved }: Props)
                 onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
             </div>
 
-            {!isEdicao && (
-              <>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
-                    Username * <span style={{ color: 'var(--text-3)' }}>(usado para login)</span>
-                  </label>
-                  <input required value={form.username} onChange={e => set('username', e.target.value)}
-                    placeholder="ex: pedro.silva"
-                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                    className={inputClass} style={inputStyle}
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
-                    Password * <span style={{ color: 'var(--text-3)' }}>(mín. 6 caracteres)</span>
-                  </label>
-                  <input type="password" required minLength={6} value={form.password}
-                    onChange={e => set('password', e.target.value)}
-                    className={inputClass} style={inputStyle}
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-                    onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-              </>
-            )}
-            {isEdicao && utilizador?.username && (
-              <div className="col-span-2">
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
-                  Username
-                </label>
-                <input readOnly value={utilizador.username}
-                  className={inputClass}
-                  style={{ ...inputStyle, background: 'var(--bg-base)', color: 'var(--text-3)', cursor: 'not-allowed' }} />
-              </div>
-            )}
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+                Username * <span style={{ color: 'var(--text-3)' }}>(usado para login)</span>
+              </label>
+              <input required value={form.username} onChange={e => set('username', e.target.value)}
+                placeholder="ex: pedro.silva"
+                autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                className={inputClass} style={inputStyle}
+                onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
+                {isEdicao
+                  ? <>Nova password <span style={{ color: 'var(--text-3)' }}>(deixe vazio para manter)</span></>
+                  : <>Password * <span style={{ color: 'var(--text-3)' }}>(mín. 6 caracteres)</span></>}
+              </label>
+              <input type="password" required={!isEdicao} minLength={6} value={form.password}
+                onChange={e => set('password', e.target.value)}
+                placeholder={isEdicao ? '••••••••' : ''}
+                autoComplete="new-password"
+                className={inputClass} style={inputStyle}
+                onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
+            </div>
 
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-2)' }}>
