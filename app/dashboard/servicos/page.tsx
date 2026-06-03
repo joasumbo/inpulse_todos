@@ -35,20 +35,19 @@ export default async function ServicosPage() {
       supabase.from('maint_utilizadores').select('id, nome, cargo').eq('ativo', true).order('nome'),
     ])
 
-  // Para técnicos, filtrar equipas às suas próprias
+  // Só admins veem todas as equipas. Técnicos e supervisores veem apenas
+  // as equipas onde estão (se não tiverem nenhuma, não veem equipas).
   let equipas = equipasRaw ?? []
   let equipaPadrao = ''
-  if (perfil.cargo === 'tecnico') {
+  if (perfil.cargo !== 'admin') {
     const { data: membros } = await supabase
       .from('maint_equipa_utilizadores')
       .select('equipa_id')
       .eq('utilizador_id', perfil.id)
       .eq('ativo', true)
-    const ids = (membros ?? []).map((m: { equipa_id: string }) => m.equipa_id)
-    if (ids.length > 0) {
-      equipas = equipas.filter(e => ids.includes(e.id))
-      if (equipas.length === 1) equipaPadrao = equipas[0].id
-    }
+    const ids = new Set((membros ?? []).map((m: { equipa_id: string }) => m.equipa_id))
+    equipas = equipas.filter(e => ids.has(e.id))
+    if (equipas.length === 1) equipaPadrao = equipas[0].id
   }
 
   return (
