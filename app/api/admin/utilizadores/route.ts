@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 
+// Resolve o username introduzido para { username, email }.
+// Se contiver "@", é um email real e é usado tal como está para o login.
+// Caso contrário, gera um slug e usa o domínio interno @inpulse.app.
+function resolveLogin(raw: string): { username: string; email: string } | null {
+  const v = (raw ?? '').trim().toLowerCase()
+  if (!v) return null
+  if (v.includes('@')) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return null
+    return { username: v, email: v }
+  }
+  const slug = v.replace(/[^a-z0-9._-]/g, '')
+  if (!slug) return null
+  return { username: slug, email: `${slug}@inpulse.app` }
+}
+
 async function verificarAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -43,15 +58,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios em falta' }, { status: 400 })
   }
 
-  const slug = username.toLowerCase().replace(/[^a-z0-9._-]/g, '')
-  if (!slug) return NextResponse.json({ error: 'Username inválido' }, { status: 400 })
+  const login = resolveLogin(username)
+  if (!login) return NextResponse.json({ error: 'Username/email inválido' }, { status: 400 })
 
-  const internalEmail = `${slug}@inpulse.app`
   const supabaseAdmin = await createAdminClient()
 
   // Criar utilizador no Supabase Auth
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: internalEmail,
+    email: login.email,
     password,
     email_confirm: true,
   })
@@ -61,7 +75,7 @@ export async function POST(req: NextRequest) {
   // Criar perfil na tabela maint_utilizadores
   const { data, error } = await supabaseAdmin
     .from('maint_utilizadores')
-    .insert({ nome, username: slug, email: internalEmail, telefone, cargo, notas, user_id: authData.user.id })
+    .insert({ nome, username: login.username, email: login.email, telefone, cargo, notas, user_id: authData.user.id })
     .select()
     .single()
 
@@ -102,14 +116,14 @@ export async function PATCH(req: NextRequest) {
 
   const updates: Record<string, unknown> = { nome, telefone, cargo, notas, ativo }
 
-  // Username (e respetivo email interno) — só se mudou
+  // Username (e respetivo email) — só se mudou. Mantém o "@" se for email real.
   let novoEmail: string | undefined
   if (typeof username === 'string' && username.trim()) {
-    const slug = username.toLowerCase().replace(/[^a-z0-9._-]/g, '')
-    if (!slug) return NextResponse.json({ error: 'Username inválido' }, { status: 400 })
-    if (slug !== existente.username) {
-      updates.username = slug
-      novoEmail = `${slug}@inpulse.app`
+    const login = resolveLogin(username)
+    if (!login) return NextResponse.json({ error: 'Username/email inválido' }, { status: 400 })
+    if (login.username !== existente.username) {
+      updates.username = login.username
+      novoEmail = login.email
       updates.email = novoEmail
     }
   }
