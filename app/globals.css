@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-base:    #f6f8fa;
+  --bg-surface: #ffffff;
+  --bg-card:    #f0f4f8;
+  --border:     #d0d7de;
+  --border-sub: #e4e9ef;
+  --text-1:     #1a2332;
+  --text-2:     #57606a;
+  --text-3:     #8c959f;
+  --accent:     #2563eb;
+  --accent-h:   #1d4ed8;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-family: 'Red Hat Text', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Red Hat Display', system-ui, sans-serif;
+}
+
+/* Mobile layout: account for fixed header (64px + safe-area-top) + bottom nav (64px + safe-area-bottom) */
+@media (max-width: 767px) {
+  .mobile-main {
+    padding-top: calc(64px + env(safe-area-inset-top) + 12px);
+    padding-bottom: calc(64px + env(safe-area-inset-bottom) + 8px);
+  }
+
+  /* Larger tap targets on mobile */
+  button, a {
+    min-height: 44px;
+  }
+
+  /* Page enter animation */
+  main > * {
+    animation: page-in 0.22s ease-out;
+  }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
