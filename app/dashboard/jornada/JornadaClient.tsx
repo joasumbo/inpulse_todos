@@ -83,6 +83,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   const [editUploading, setEditUploading] = useState(false)
   const [savingEdit, setSavingEdit]     = useState(false)
   const [imgErro, setImgErro]           = useState('')
+  const [finalizando, setFinalizando]   = useState(false)
 
   const [historico, setHistorico]       = useState<Jornada[]>([])
   const [jornadaAberta, setJAberta]     = useState<string | null>(null)
@@ -143,6 +144,61 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
       // evitar crash
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Finaliza o dia de trabalho: termina a ação ativa (se houver) e marca o fim.
+  async function finalizarJornada() {
+    if (!jornada || isViewingOther) return
+    setFinalizando(true)
+    try {
+      if (acaoAtiva) {
+        const r = await fetch(`/api/admin/jornadas/${jornada.id}/acoes/${acaoAtiva.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fim: new Date().toISOString(),
+            descricao: descricao || acaoAtiva.descricao || null,
+            imagem_url: imagemUrl || acaoAtiva.imagem_url || null,
+          }),
+        })
+        if (r.ok) {
+          const a: Acao = await r.json()
+          setAcoes(prev => prev.map(x => x.id === a.id ? a : x))
+          setAcaoAtiva(null)
+        }
+      }
+      const res = await fetch('/api/admin/jornadas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: jornada.id, fim: new Date().toISOString() }),
+      })
+      if (res.ok) {
+        const j: Jornada = await res.json()
+        setJornada(j)
+        setAcaoAtiva(null)
+      }
+    } finally {
+      setFinalizando(false)
+    }
+  }
+
+  // Reabre a jornada (caso tenha sido finalizada por engano).
+  async function reabrirJornada() {
+    if (!jornada || isViewingOther) return
+    setFinalizando(true)
+    try {
+      const res = await fetch('/api/admin/jornadas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: jornada.id, fim: null }),
+      })
+      if (res.ok) {
+        const j: Jornada = await res.json()
+        setJornada(j)
+      }
+    } finally {
+      setFinalizando(false)
     }
   }
 
@@ -391,6 +447,40 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
+          {/* Estado da jornada: hora de início e de fim */}
+          {jornada && (
+            <div className="rounded-2xl p-4 mb-6 flex items-center justify-between gap-3"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-sub)' }}>
+              <div className="flex items-center gap-5">
+                <div>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>Início</p>
+                  <p className="text-base font-bold font-mono" style={{ color: 'var(--text-1)' }}>{formatHora(jornada.created_at)}</p>
+                </div>
+                <div className="w-px h-9" style={{ background: 'var(--border-sub)' }} />
+                <div>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>Fim</p>
+                  <p className="text-base font-bold font-mono" style={{ color: jornada.fim ? 'var(--text-1)' : 'var(--text-3)' }}>
+                    {jornada.fim ? formatHora(jornada.fim) : '—'}
+                  </p>
+                </div>
+              </div>
+              {jornada.fim ? (
+                !isViewingOther && (
+                  <button type="button" onClick={reabrirJornada} disabled={finalizando}
+                    className="text-xs font-semibold px-3 py-2 rounded-xl"
+                    style={{ background: 'var(--bg-card)', color: 'var(--text-2)' }}>
+                    Reabrir
+                  </button>
+                )
+              ) : (
+                <span className="text-xs font-semibold px-3 py-1.5 rounded-full"
+                  style={{ background: '#dcfce7', color: '#16a34a' }}>
+                  Em curso
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Ação ativa */}
           {acaoAtiva && meta && (
             <div className="rounded-2xl p-5 mb-6" style={{ background: meta.bg, border: `1.5px solid ${meta.cor}30` }}>
@@ -456,8 +546,8 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
-          {/* Botões iniciar ação — só com jornada criada e para o próprio utilizador */}
-          {jornada && !acaoAtiva && !isViewingOther && (
+          {/* Botões iniciar ação — só com jornada ativa (não finalizada) e para o próprio utilizador */}
+          {jornada && !jornada.fim && !acaoAtiva && !isViewingOther && (
             <div className="grid grid-cols-2 gap-3 mb-6">
               {(Object.entries(TIPO_META) as [TipoAcao, typeof TIPO_META[TipoAcao]][]).map(([tipo, m]) => {
                 const Icon = m.icon
@@ -587,6 +677,20 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
+          {/* Finalizar dia de trabalho */}
+          {jornada && !jornada.fim && !isViewingOther && (
+            <button
+              type="button"
+              onClick={finalizarJornada}
+              disabled={finalizando}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold mb-6"
+              style={{ background: '#dc2626', color: '#fff', opacity: finalizando ? 0.7 : 1 }}
+            >
+              {finalizando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              Finalizar Jornada de Trabalho
+            </button>
+          )}
+
           {/* Histórico */}
           <div>
             <button
@@ -622,7 +726,12 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                         >
                           <div className="flex items-center gap-3">
                             <CalendarDays size={16} style={{ color: 'var(--text-3)' }} />
-                            <span className="text-sm font-semibold capitalize" style={{ color: 'var(--text-1)' }}>{label}</span>
+                            <div className="text-left">
+                              <span className="block text-sm font-semibold capitalize" style={{ color: 'var(--text-1)' }}>{label}</span>
+                              <span className="text-xs font-mono" style={{ color: 'var(--text-3)' }}>
+                                {formatHora(j.created_at)}{j.fim ? ` → ${formatHora(j.fim)}` : ''}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {isAdmin && j.funcionario && (

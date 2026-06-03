@@ -70,3 +70,40 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { status: 201 })
 }
+
+// PATCH — finalizar (fim = agora) ou reabrir (fim = null) a jornada do dia
+export async function PATCH(req: NextRequest) {
+  const utilizador = await getUtilizador()
+  if (!utilizador) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const body = await req.json()
+  const { id, fim } = body
+  if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 })
+
+  const supabase = await createAdminClient()
+
+  // Só o próprio (ou admin) pode finalizar a jornada
+  const { data: jornada } = await supabase
+    .from('maint_jornadas')
+    .select('funcionario_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!jornada) return NextResponse.json({ error: 'Jornada não encontrada' }, { status: 404 })
+  if (utilizador.cargo !== 'admin' && jornada.funcionario_id !== utilizador.id) {
+    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
+
+  // fim === null → reabrir; caso contrário usa o valor enviado ou agora
+  const novoFim = fim === null ? null : (fim ?? new Date().toISOString())
+
+  const { data, error } = await supabase
+    .from('maint_jornadas')
+    .update({ fim: novoFim })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}

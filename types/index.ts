@@ -59,6 +59,7 @@ export interface Jornada {
   id: string
   funcionario_id: string
   dia: string
+  fim: string | null
   created_at: string
   funcionario?: Pick<Utilizador, 'id' | 'nome'>
   acoes?: Acao[]
