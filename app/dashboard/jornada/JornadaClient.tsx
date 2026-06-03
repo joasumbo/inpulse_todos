@@ -4,11 +4,21 @@ import { useState, useEffect } from 'react'
 import { Car, Wrench, UtensilsCrossed, Receipt, CheckCircle2, Clock, ChevronDown, ChevronUp, Camera, Loader2, CalendarDays, Eye } from 'lucide-react'
 import type { Acao, Jornada, TipoAcao } from '@/types'
 
-const TIPO_META: Record<TipoAcao, { label: string; cor: string; bg: string; icon: React.ElementType }> = {
+type Meta = { label: string; cor: string; bg: string; icon: React.ElementType }
+
+const TIPO_META: Record<TipoAcao, Meta> = {
   viagem:       { label: 'Viagem',       cor: '#2563eb', bg: '#dbeafe', icon: Car },
   trabalho:     { label: 'Trabalho',     cor: '#16a34a', bg: '#dcfce7', icon: Wrench },
   alimentacao:  { label: 'Alimentação',  cor: '#d97706', bg: '#fef3c7', icon: UtensilsCrossed },
   despesa:      { label: 'Despesa',      cor: '#7c3aed', bg: '#ede9fe', icon: Receipt },
+}
+
+// Fallback defensivo: evita crash de renderização se uma ação tiver um tipo
+// inesperado/legado (ex.: dados antigos). Sem isto, TIPO_META[tipo] === undefined
+// e aceder a .icon/.cor rebenta a página inteira.
+const META_FALLBACK: Meta = { label: 'Ação', cor: '#6b7280', bg: '#f3f4f6', icon: Clock }
+function metaFor(tipo: string): Meta {
+  return TIPO_META[tipo as TipoAcao] ?? META_FALLBACK
 }
 
 function formatHora(iso: string) {
@@ -211,9 +221,13 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     if (jornadaAberta === jornadaId) { setJAberta(null); return }
     setJAberta(jornadaId)
     if (!acoesHist[jornadaId]) {
-      const res = await fetch(`/api/admin/jornadas/${jornadaId}/acoes`)
-      const data: Acao[] = await res.json()
-      setAcoesHist(prev => ({ ...prev, [jornadaId]: data }))
+      try {
+        const res = await fetch(`/api/admin/jornadas/${jornadaId}/acoes`)
+        const data = await res.json()
+        setAcoesHist(prev => ({ ...prev, [jornadaId]: Array.isArray(data) ? data : [] }))
+      } catch {
+        setAcoesHist(prev => ({ ...prev, [jornadaId]: [] }))
+      }
     }
   }
 
@@ -222,7 +236,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mostrarHist, selectedFuncionario])
 
-  const meta = acaoAtiva ? TIPO_META[acaoAtiva.tipo as TipoAcao] : null
+  const meta = acaoAtiva ? metaFor(acaoAtiva.tipo) : null
 
   return (
     <div className="p-4 md:p-8 max-w-2xl">
@@ -377,7 +391,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
               </div>
               <div className="divide-y" style={{ borderColor: 'var(--border-sub)' }}>
                 {acoes.filter(a => a.fim).map(a => {
-                  const m = TIPO_META[a.tipo as TipoAcao]
+                  const m = metaFor(a.tipo)
                   const Icon = m.icon
                   const dur = formatDuracao(a.inicio, a.fim)
                   return (
@@ -457,7 +471,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                             {acs.length === 0 ? (
                               <p className="text-sm text-center py-6" style={{ color: 'var(--text-3)' }}>Sem ações registadas</p>
                             ) : acs.map(a => {
-                              const m = TIPO_META[a.tipo as TipoAcao]
+                              const m = metaFor(a.tipo)
                               const Icon = m.icon
                               const dur = formatDuracao(a.inicio, a.fim)
                               return (
