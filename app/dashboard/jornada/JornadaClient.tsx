@@ -40,14 +40,18 @@ function hojeLocal() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-async function uploadImagem(file: File, jornadaId: string): Promise<string | null> {
-  const fd = new FormData()
-  fd.append('file', file)
-  fd.append('jornada_id', jornadaId)
-  const res = await fetch('/api/admin/jornadas/upload', { method: 'POST', body: fd })
-  if (!res.ok) return null
-  const { url } = await res.json()
-  return url ?? null
+async function uploadImagem(file: File, jornadaId: string): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('jornada_id', jornadaId)
+    const res = await fetch('/api/admin/jornadas/upload', { method: 'POST', body: fd })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { url: null, error: data?.error ?? 'Falha no upload da foto' }
+    return { url: data?.url ?? null, error: null }
+  } catch {
+    return { url: null, error: 'Erro de rede ao carregar a foto' }
+  }
 }
 
 interface Props {
@@ -78,6 +82,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   const [editImg, setEditImg]           = useState('')
   const [editUploading, setEditUploading] = useState(false)
   const [savingEdit, setSavingEdit]     = useState(false)
+  const [imgErro, setImgErro]           = useState('')
 
   const [historico, setHistorico]       = useState<Jornada[]>([])
   const [jornadaAberta, setJAberta]     = useState<string | null>(null)
@@ -98,6 +103,9 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     try {
       // Nunca cria a jornada automaticamente — apenas lê a do dia (se existir).
       const isOutro = funcionarioId !== utilizadorId
+      // Ao ver outro funcionário, mostrar logo o histórico (as jornadas dele
+      // estão quase sempre em dias anteriores, não em "hoje").
+      if (isOutro) setMostrarHist(true)
       const url = isOutro
         ? `/api/admin/jornadas?funcionario_id=${funcionarioId}`
         : '/api/admin/jornadas'
@@ -210,9 +218,11 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     const file = e.target.files?.[0]
     if (!file || !jornada) return
     setUploadingImg(true)
+    setImgErro('')
     try {
-      const url = await uploadImagem(file, jornada.id)
+      const { url, error } = await uploadImagem(file, jornada.id)
       if (url) setImagemUrl(url)
+      else if (error) setImgErro(error)
     } finally {
       setUploadingImg(false)
       e.target.value = ''
@@ -236,9 +246,11 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     const file = e.target.files?.[0]
     if (!file || !jornada) return
     setEditUploading(true)
+    setImgErro('')
     try {
-      const url = await uploadImagem(file, jornada.id)
+      const { url, error } = await uploadImagem(file, jornada.id)
       if (url) setEditImg(url)
+      else if (error) setImgErro(error)
     } finally {
       setEditUploading(false)
       e.target.value = ''
@@ -346,13 +358,17 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin" style={{ color: 'var(--text-3)' }} />
         </div>
-      ) : isViewingOther && !jornada ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <CalendarDays size={36} style={{ color: 'var(--text-3)', opacity: 0.35 }} />
-          <p className="text-sm" style={{ color: 'var(--text-3)' }}>Sem registo de jornada para hoje</p>
-        </div>
       ) : (
         <>
+          {/* Sem registo hoje (a ver outro funcionário) — o histórico continua visível abaixo */}
+          {isViewingOther && !jornada && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl mb-6"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-sub)' }}>
+              <CalendarDays size={36} style={{ color: 'var(--text-3)', opacity: 0.35 }} />
+              <p className="text-sm" style={{ color: 'var(--text-3)' }}>Sem registo de jornada para hoje</p>
+            </div>
+          )}
+
           {/* Iniciar jornada — próprio utilizador, ainda sem jornada hoje */}
           {!jornada && !isViewingOther && (
             <div className="rounded-2xl p-8 mb-6 flex flex-col items-center text-center"
@@ -422,6 +438,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                     {imagemUrl && (
                       <img src={imagemUrl} alt="preview" className="mt-2 rounded-xl max-h-36 object-cover" />
                     )}
+                    {imgErro && <p className="text-xs mt-2" style={{ color: '#dc2626' }}>{imgErro}</p>}
                   </div>
 
                   <button
@@ -520,6 +537,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                             {editImg && (
                               <img src={editImg} alt="preview" className="rounded-xl max-h-28 object-cover" />
                             )}
+                            {imgErro && <p className="text-xs" style={{ color: '#dc2626' }}>{imgErro}</p>}
                             <div className="flex gap-2">
                               <button
                                 type="button"

@@ -17,8 +17,17 @@ export async function POST(req: NextRequest) {
   const path = `${jornadaId}/${Date.now()}.${ext}`
   const bytes = await file.arrayBuffer()
 
+  // Garantir que o bucket existe e é PÚBLICO (idempotente). Sem isto, as fotos
+  // podem ser carregadas mas não conseguem ser lidas (URL pública dá 403).
+  const { data: bucket } = await admin.storage.getBucket('jornada')
+  if (!bucket) {
+    await admin.storage.createBucket('jornada', { public: true })
+  } else if (!bucket.public) {
+    await admin.storage.updateBucket('jornada', { public: true })
+  }
+
   const doUpload = () =>
-    admin.storage.from('jornada').upload(path, bytes, { contentType: file.type })
+    admin.storage.from('jornada').upload(path, bytes, { contentType: file.type, upsert: true })
 
   let { error } = await doUpload()
 
