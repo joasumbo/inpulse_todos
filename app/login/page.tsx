@@ -17,8 +17,14 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
+    // Aceitar login por username: se não houver "@", assume o domínio interno.
+    const identifier = email.trim()
+    const loginEmail = identifier.includes('@')
+      ? identifier.toLowerCase()
+      : `${identifier.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@inpulse.app`
+
     const sb = createClient()
-    const { error } = await sb.auth.signInWithPassword({ email, password })
+    const { error } = await sb.auth.signInWithPassword({ email: loginEmail, password })
 
     if (error) {
       setError('Credenciais inválidas. Verifica o email e a password.')
@@ -107,16 +113,19 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-2)' }}>
-                Email
+                Email ou username
               </label>
               <div className="relative">
                 <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-3)' }} />
                 <input
-                  type="email"
+                  type="text"
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="nome@empresa.pt"
+                  placeholder="username ou nome@empresa.pt"
                   className="w-full pl-11 pr-4 py-3 rounded-xl text-sm outline-none transition-all"
                   style={{
                     background: 'var(--bg-surface)',
