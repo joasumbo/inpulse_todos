@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 
+// Reutiliza o bucket que já existe e funciona (o mesmo dos anexos de serviços),
+// em vez de depender da criação do bucket "jornada" (que falhava em produção).
+const BUCKET = 'maint-anexos'
+const UM_ANO = 60 * 60 * 24 * 365
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -8,40 +13,32 @@ export async function POST(req: NextRequest) {
 
   const admin = await createAdminClient()
   const formData = await req.formData()
-  const file = formData.get('file') as File
+  const file = formData.get('file') as File | null
   const jornadaId = (formData.get('jornada_id') as string) || 'misc'
 
   if (!file) return NextResponse.json({ error: 'Nenhum ficheiro' }, { status: 400 })
+  if (file.size > 10 * 1024 * 1024) {
+    return NextResponse.json({ error: 'Ficheiro muito grande (máx. 10 MB)' }, { status: 400 })
+  }
 
   const ext = file.name.split('.').pop() ?? 'jpg'
-  const path = `${jornadaId}/${Date.now()}.${ext}`
+  const path = `jornadas/${jornadaId}/${crypto.randomUUID()}.${ext}`
   const bytes = await file.arrayBuffer()
 
-  // Garantir que o bucket existe e é PÚBLICO (idempotente). Sem isto, as fotos
-  // podem ser carregadas mas não conseguem ser lidas (URL pública dá 403).
-  const { data: bucket } = await admin.storage.getBucket('jornada')
-  if (!bucket) {
-    await admin.storage.createBucket('jornada', { public: true })
-  } else if (!bucket.public) {
-    await admin.storage.updateBucket('jornada', { public: true })
+  const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
+    contentType: file.type || 'image/jpeg',
+    upsert: false,
+  })
+  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
+
+  // Bucket privado → URL assinado de longa duração (1 ano) para mostrar a foto.
+  const { data, error: signErr } = await admin.storage
+    .from(BUCKET)
+    .createSignedUrl(path, UM_ANO)
+
+  if (signErr || !data?.signedUrl) {
+    return NextResponse.json({ error: signErr?.message ?? 'Falha ao gerar URL da foto' }, { status: 500 })
   }
 
-  const doUpload = () =>
-    admin.storage.from('jornada').upload(path, bytes, { contentType: file.type, upsert: true })
-
-  let { error } = await doUpload()
-
-  if (error) {
-    const msg = error.message?.toLowerCase() ?? ''
-    if (msg.includes('bucket') || msg.includes('not found')) {
-      await admin.storage.createBucket('jornada', { public: true })
-      const r2 = await doUpload()
-      if (r2.error) return NextResponse.json({ error: r2.error.message }, { status: 500 })
-    } else {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-  }
-
-  const { data: { publicUrl } } = admin.storage.from('jornada').getPublicUrl(path)
-  return NextResponse.json({ url: publicUrl })
+  return NextResponse.json({ url: data.signedUrl })
 }
