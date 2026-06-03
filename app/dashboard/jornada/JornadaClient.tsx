@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Car, Wrench, UtensilsCrossed, Receipt, CheckCircle2, Clock, ChevronDown, ChevronUp, Camera, Loader2, CalendarDays, Eye } from 'lucide-react'
+import { Car, Wrench, UtensilsCrossed, Receipt, CheckCircle2, Clock, ChevronDown, ChevronUp, Camera, Loader2, CalendarDays, Eye, PlayCircle } from 'lucide-react'
 import type { Acao, Jornada, TipoAcao } from '@/types'
 
 type Meta = { label: string; cor: string; bg: string; icon: React.ElementType }
 
 const TIPO_META: Record<TipoAcao, Meta> = {
   viagem:       { label: 'Viagem',       cor: '#2563eb', bg: '#dbeafe', icon: Car },
-  trabalho:     { label: 'Trabalho',     cor: '#16a34a', bg: '#dcfce7', icon: Wrench },
+  trabalho:     { label: 'Serviço',      cor: '#16a34a', bg: '#dcfce7', icon: Wrench },
   alimentacao:  { label: 'Alimentação',  cor: '#d97706', bg: '#fef3c7', icon: UtensilsCrossed },
   despesa:      { label: 'Despesa',      cor: '#7c3aed', bg: '#ede9fe', icon: Receipt },
 }
@@ -89,28 +89,41 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     setDescricao('')
     setImagemUrl('')
     try {
+      // Nunca cria a jornada automaticamente — apenas lê a do dia (se existir).
+      const isOutro = funcionarioId !== utilizadorId
+      const url = isOutro
+        ? `/api/admin/jornadas?funcionario_id=${funcionarioId}`
+        : '/api/admin/jornadas'
       let j: Jornada | null = null
-      if (funcionarioId !== utilizadorId) {
-        // Admin a ver outro utilizador: só GET, não cria jornada
-        const res = await fetch(`/api/admin/jornadas?funcionario_id=${funcionarioId}`)
-        if (res.ok) {
-          const data = await res.json()
-          j = Array.isArray(data) ? (data.find((x: Jornada) => x.dia === hoje) ?? null) : null
-        }
-      } else {
-        // Jornada própria: cria se não existir
-        const res = await fetch('/api/admin/jornadas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dia: hoje }),
-        })
-        if (res.ok) {
-          const parsed = await res.json()
-          j = parsed?.id ? parsed : null
-        }
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        j = Array.isArray(data) ? (data.find((x: Jornada) => x.dia === hoje) ?? null) : null
       }
       setJornada(j)
       if (j) await carregarAcoes(j.id)
+    } catch {
+      // evitar crash
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cria a jornada do dia para o próprio utilizador (botão "Iniciar Jornada").
+  async function iniciarJornada() {
+    if (isViewingOther) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/jornadas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dia: hoje }),
+      })
+      if (res.ok) {
+        const j: Jornada = await res.json()
+        setJornada(j?.id ? j : null)
+        if (j?.id) await carregarAcoes(j.id)
+      }
     } catch {
       // evitar crash
     } finally {
@@ -288,6 +301,28 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         </div>
       ) : (
         <>
+          {/* Iniciar jornada — próprio utilizador, ainda sem jornada hoje */}
+          {!jornada && !isViewingOther && (
+            <div className="rounded-2xl p-8 mb-6 flex flex-col items-center text-center"
+              style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-sub)' }}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: '#dbeafe' }}>
+                <PlayCircle size={24} style={{ color: 'var(--accent)' }} />
+              </div>
+              <p className="text-sm mb-5" style={{ color: 'var(--text-2)' }}>
+                Ainda não iniciaste a jornada de hoje.
+              </p>
+              <button
+                type="button"
+                onClick={iniciarJornada}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold"
+                style={{ background: 'var(--accent)', color: '#fff', opacity: loading ? 0.7 : 1 }}
+              >
+                <PlayCircle size={18} /> Iniciar Jornada de Trabalho
+              </button>
+            </div>
+          )}
+
           {/* Ação ativa */}
           {acaoAtiva && meta && (
             <div className="rounded-2xl p-5 mb-6" style={{ background: meta.bg, border: `1.5px solid ${meta.cor}30` }}>
@@ -352,8 +387,8 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
-          {/* Botões iniciar — só para o próprio utilizador */}
-          {!acaoAtiva && !isViewingOther && (
+          {/* Botões iniciar ação — só com jornada criada e para o próprio utilizador */}
+          {jornada && !acaoAtiva && !isViewingOther && (
             <div className="grid grid-cols-2 gap-3 mb-6">
               {(Object.entries(TIPO_META) as [TipoAcao, typeof TIPO_META[TipoAcao]][]).map(([tipo, m]) => {
                 const Icon = m.icon
