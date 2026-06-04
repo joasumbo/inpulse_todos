@@ -31,6 +31,11 @@ export default function EquipasClient({ equipas: inicial, utilizadores, contagem
     setModal(false)
   }
 
+  function onDeleted(id: string) {
+    setLista(prev => prev.filter(x => x.id !== id))
+    setModal(false)
+  }
+
   const filtradas = lista.filter(e => {
     const q = pesquisa.toLowerCase()
     const matchQ = e.nome.toLowerCase().includes(q) || (e.descricao ?? '').toLowerCase().includes(q)
@@ -172,6 +177,7 @@ export default function EquipasClient({ equipas: inicial, utilizadores, contagem
           utilizadores={utilizadores}
           onClose={() => setModal(false)}
           onSaved={onSaved}
+          onDeleted={onDeleted}
         />
       )}
     </div>

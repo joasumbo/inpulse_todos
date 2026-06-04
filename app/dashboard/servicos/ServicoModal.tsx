@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, AlertCircle } from 'lucide-react'
+import { X, AlertCircle, Trash2 } from 'lucide-react'
 import type { Loja, Equipa, Utilizador, Cargo } from '@/types'
 import type { ServicoUI } from './types'
 import { PRIORIDADE_META, COLUNAS } from './KanbanBoard'
@@ -43,16 +43,33 @@ interface Props {
   canEdit:       boolean
   onClose:       () => void
   onSaved:       (s: ServicoUI) => void
+  onDeleted?:    (id: string) => void
 }
 
 export default function ServicoModal({
-  servico, estadoInicial, lojas, equipas, utilizadores, cargo, canEdit, onClose, onSaved,
+  servico, estadoInicial, lojas, equipas, utilizadores, cargo, canEdit, onClose, onSaved, onDeleted,
 }: Props) {
   const isEdicao  = !!servico
   const isTecnico = cargo === 'tecnico'
   const canSave   = canEdit || (isTecnico && isEdicao)
+  const canDelete = cargo === 'admin'
 
   const [tab, setTab] = useState<'detalhes' | 'materiais' | 'anexos'>('detalhes')
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (!servico) return
+    if (!confirm(`Eliminar definitivamente o serviço "${servico.numero} — ${servico.titulo}"? Esta ação não pode ser anulada.`)) return
+    setErro(''); setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/servicos/${servico.id}`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Erro ao eliminar') }
+      onDeleted?.(servico.id)
+    } catch (err: unknown) {
+      setErro(err instanceof Error ? err.message : 'Erro ao eliminar')
+      setDeleting(false)
+    }
+  }
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -469,6 +486,17 @@ export default function ServicoModal({
 
             {/* Footer */}
             <div className="flex gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border-sub)' }}>
+              {isEdicao && canDelete && onDeleted && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', opacity: deleting ? 0.6 : 1 }}
+                >
+                  <Trash2 size={15} /> {deleting ? 'A eliminar...' : 'Eliminar'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}

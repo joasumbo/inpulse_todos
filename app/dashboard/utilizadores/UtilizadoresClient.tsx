@@ -29,6 +29,11 @@ export default function UtilizadoresClient({ utilizadores: inicial }: { utilizad
     setModal(false)
   }
 
+  function onDeleted(id: string) {
+    setLista(prev => prev.filter(x => x.id !== id))
+    setModal(false)
+  }
+
   function displayLogin(u: Utilizador) {
     return u.username ?? u.email
   }
@@ -220,6 +225,7 @@ export default function UtilizadoresClient({ utilizadores: inicial }: { utilizad
           utilizador={selecionado}
           onClose={() => setModal(false)}
           onSaved={onSaved}
+          onDeleted={onDeleted}
         />
       )}
     </div>

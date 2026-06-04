@@ -35,6 +35,11 @@ export default function LojasClient({ lojas: inicial }: { lojas: Loja[] }) {
     setModal(false)
   }
 
+  function onDeleted(id: string) {
+    setLista(prev => prev.filter(x => x.id !== id))
+    setModal(false)
+  }
+
   const filtradas = lista.filter(l => {
     const q = pesquisa.toLowerCase()
     const matchPesquisa =
@@ -252,6 +257,7 @@ export default function LojasClient({ lojas: inicial }: { lojas: Loja[] }) {
           loja={selecionada}
           onClose={() => setModal(false)}
           onSaved={onSaved}
+          onDeleted={onDeleted}
         />
       )}
     </div>

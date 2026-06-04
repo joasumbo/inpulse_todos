@@ -49,6 +49,11 @@ export default function ServicosClient({ servicos: inicial, lojas, equipas, util
     setModal(false)
   }
 
+  function onDeleted(id: string) {
+    setLista(prev => prev.filter(x => x.id !== id))
+    setModal(false)
+  }
+
 
   const filtrados = useMemo(() => {
     return lista.filter(s => {
@@ -222,6 +227,7 @@ export default function ServicosClient({ servicos: inicial, lojas, equipas, util
           canEdit={canEdit}
           onClose={() => setModal(false)}
           onSaved={onSaved}
+          onDeleted={cargo === 'admin' ? onDeleted : undefined}
         />
       )}
     </div>

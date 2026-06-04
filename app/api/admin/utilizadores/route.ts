@@ -149,3 +149,43 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
+
+// DELETE — eliminar utilizador (admin only). Remove também a conta de Auth.
+export async function DELETE(req: NextRequest) {
+  const admin = await verificarAdmin()
+  if (!admin) return NextResponse.json({ error: 'Não autorizado' }, { status: 403 })
+
+  const id = new URL(req.url).searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 })
+
+  const supabase = await createAdminClient()
+
+  const { data: existente } = await supabase
+    .from('maint_utilizadores')
+    .select('user_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  // Impedir que o admin elimine a própria conta (evita ficar sem acesso).
+  if (existente?.user_id && existente.user_id === admin.id) {
+    return NextResponse.json({ error: 'Não podes eliminar a tua própria conta.' }, { status: 400 })
+  }
+
+  // Remover associações de equipa para evitar bloqueio por FK.
+  await supabase.from('maint_equipa_utilizadores').delete().eq('utilizador_id', id)
+
+  const { error } = await supabase.from('maint_utilizadores').delete().eq('id', id)
+  if (error) {
+    if (error.code === '23503') {
+      return NextResponse.json({ error: 'Não é possível eliminar: este utilizador tem registos associados.' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Remover do Auth (não falha a operação se isto der erro).
+  if (existente?.user_id) {
+    await supabase.auth.admin.deleteUser(existente.user_id)
+  }
+
+  return NextResponse.json({ ok: true })
+}

@@ -45,6 +45,11 @@ export default function MateriaisClient({ materiais: inicial, cargo }: Props) {
     setModal(false)
   }
 
+  function onDeleted(id: string) {
+    setLista(prev => prev.filter(x => x.id !== id))
+    setModal(false)
+  }
+
   const filtrados = useMemo(() => {
     return lista.filter(m => {
       if (pesquisa) {
@@ -229,6 +234,7 @@ export default function MateriaisClient({ materiais: inicial, cargo }: Props) {
           material={sel}
           onClose={() => setModal(false)}
           onSaved={onSaved}
+          onDeleted={cargo === 'admin' ? onDeleted : undefined}
         />
       )}
     </div>

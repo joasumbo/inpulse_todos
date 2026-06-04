@@ -21,6 +21,7 @@ interface Props {
   utilizadores: Pick<Utilizador, 'id' | 'nome' | 'cargo' | 'email'>[]
   onClose: () => void
   onSaved: (e: Equipa) => void
+  onDeleted?: (id: string) => void
 }
 
 const inputStyle = {
@@ -29,8 +30,23 @@ const inputStyle = {
   color: 'var(--text-1)',
 }
 
-export default function EquipaModal({ equipa, utilizadores, onClose, onSaved }: Props) {
+export default function EquipaModal({ equipa, utilizadores, onClose, onSaved, onDeleted }: Props) {
   const isEdicao = !!equipa
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (!equipa) return
+    if (!confirm(`Eliminar definitivamente a equipa "${equipa.nome}"? Esta ação não pode ser anulada.`)) return
+    setErro(''); setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/equipas?id=${equipa.id}`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Erro ao eliminar') }
+      onDeleted?.(equipa.id)
+    } catch (err: unknown) {
+      setErro(err instanceof Error ? err.message : 'Erro ao eliminar')
+      setDeleting(false)
+    }
+  }
 
   const [form, setForm] = useState({
     nome:      equipa?.nome      ?? '',
@@ -229,6 +245,13 @@ export default function EquipaModal({ equipa, utilizadores, onClose, onSaved }: 
 
             {/* Botões */}
             <div className="flex gap-3 pt-1" style={{ borderTop: '1px solid var(--border-sub)', paddingTop: '16px' }}>
+              {isEdicao && onDeleted && (
+                <button type="button" onClick={handleDelete} disabled={deleting}
+                  className="flex items-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all"
+                  style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', opacity: deleting ? 0.6 : 1 }}>
+                  <Trash2 size={15} /> {deleting ? 'A eliminar...' : 'Eliminar'}
+                </button>
+              )}
               <button type="button" onClick={onClose}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium"
                 style={{ background: 'var(--bg-card)', color: 'var(--text-2)', border: '1px solid var(--border-sub)' }}>

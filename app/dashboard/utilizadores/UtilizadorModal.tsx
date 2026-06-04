@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, AlertCircle } from 'lucide-react'
+import { X, AlertCircle, Trash2 } from 'lucide-react'
 import type { Utilizador, Cargo } from '@/types'
 
 const inputClass = "w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
@@ -15,10 +15,26 @@ interface Props {
   utilizador: Utilizador | null
   onClose: () => void
   onSaved: (u: Utilizador) => void
+  onDeleted?: (id: string) => void
 }
 
-export default function UtilizadorModal({ utilizador, onClose, onSaved }: Props) {
+export default function UtilizadorModal({ utilizador, onClose, onSaved, onDeleted }: Props) {
   const isEdicao = !!utilizador
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    if (!utilizador) return
+    if (!confirm(`Eliminar definitivamente "${utilizador.nome}"? Esta ação não pode ser anulada.`)) return
+    setErro(''); setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/utilizadores?id=${utilizador.id}`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? 'Erro ao eliminar') }
+      onDeleted?.(utilizador.id)
+    } catch (err: unknown) {
+      setErro(err instanceof Error ? err.message : 'Erro ao eliminar')
+      setDeleting(false)
+    }
+  }
 
   const [form, setForm] = useState({
     nome:     utilizador?.nome     ?? '',
@@ -196,6 +212,13 @@ export default function UtilizadorModal({ utilizador, onClose, onSaved }: Props)
 
           {/* Botões */}
           <div className="flex gap-3 pt-2" style={{ borderTop: '1px solid var(--border-sub)', paddingTop: '16px' }}>
+            {isEdicao && onDeleted && (
+              <button type="button" onClick={handleDelete} disabled={deleting}
+                className="flex items-center gap-2 py-2.5 px-4 rounded-xl text-sm font-medium transition-all"
+                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', opacity: deleting ? 0.6 : 1 }}>
+                <Trash2 size={15} /> {deleting ? 'A eliminar...' : 'Eliminar'}
+              </button>
+            )}
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{ background: 'var(--bg-card)', color: 'var(--text-2)', border: '1px solid var(--border-sub)' }}>

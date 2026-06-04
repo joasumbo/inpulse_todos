@@ -40,12 +40,18 @@ export async function DELETE(
   const { id } = await context.params
   const supabase = await createAdminClient()
 
-  // Soft delete to preserve history in servico_materiais
+  // Eliminar definitivo. Se o material estiver associado a serviços, a FK bloqueia
+  // (proteção) e devolvemos uma mensagem clara em vez de partir a base de dados.
   const { error } = await supabase
     .from('maint_materiais')
-    .update({ ativo: false })
+    .delete()
     .eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    if (error.code === '23503') {
+      return NextResponse.json({ error: 'Não é possível eliminar: este material está a ser usado em serviços. Remova-o desses serviços primeiro.' }, { status: 409 })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ ok: true })
 }
