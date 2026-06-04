@@ -25,10 +25,23 @@ export async function POST(req: NextRequest) {
   const path = `jornadas/${jornadaId}/${crypto.randomUUID()}.${ext}`
   const bytes = await file.arrayBuffer()
 
-  const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
+  const doUpload = () => admin.storage.from(BUCKET).upload(path, bytes, {
     contentType: file.type || 'image/jpeg',
     upsert: false,
   })
+
+  let { error: upErr } = await doUpload()
+  // Auto-cria o bucket privado se ainda não existir e tenta de novo (à prova de bala).
+  if (upErr && /bucket|not found/i.test(upErr.message ?? '')) {
+    const { error: createErr } = await admin.storage.createBucket(BUCKET, { public: false })
+    if (createErr && !/exist/i.test(createErr.message ?? '')) {
+      return NextResponse.json(
+        { error: `Não foi possível preparar o armazenamento de fotos: ${createErr.message}` },
+        { status: 500 },
+      )
+    }
+    upErr = (await doUpload()).error
+  }
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 })
 
   // Bucket privado → URL assinado de longa duração (1 ano) para mostrar a foto.
