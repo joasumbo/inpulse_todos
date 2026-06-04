@@ -128,10 +128,12 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  // Alterações de Auth (email/password) — requerem user_id
+  // Alterações de Auth (email/password) — requerem user_id.
+  // email_confirm: true marca o novo email como confirmado de imediato, evitando
+  // o estado "por confirmar" que impedia a alteração de ficar efetiva.
   if (existente.user_id && (novoEmail || password)) {
-    const authUpdate: { email?: string; password?: string } = {}
-    if (novoEmail) authUpdate.email = novoEmail
+    const authUpdate: { email?: string; password?: string; email_confirm?: boolean } = {}
+    if (novoEmail) { authUpdate.email = novoEmail; authUpdate.email_confirm = true }
     if (password)  authUpdate.password = String(password)
     const { error: authErr } = await supabase.auth.admin.updateUserById(existente.user_id, authUpdate)
     if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 })
