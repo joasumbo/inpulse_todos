@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Car, Wrench, UtensilsCrossed, Receipt, CheckCircle2, Clock, ChevronDown, ChevronUp, Camera, Loader2, CalendarDays, Eye, PlayCircle } from 'lucide-react'
+import { Car, Wrench, UtensilsCrossed, Receipt, CheckCircle2, Clock, ChevronDown, ChevronUp, Camera, Loader2, CalendarDays, Eye, PlayCircle, Trash2 } from 'lucide-react'
 import type { Acao, Jornada, TipoAcao } from '@/types'
 
 type Meta = { label: string; cor: string; bg: string; icon: React.ElementType }
@@ -91,8 +91,10 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   const [loadingHist, setLoadingHist]   = useState(false)
   const [mostrarHist, setMostrarHist]   = useState(false)
 
-  // Admin a ver jornada de outro funcionário = modo leitura
+  // Admin a ver jornada de outro funcionário. Os admins PODEM gerir (editar/apagar/
+  // adicionar) as jornadas de outros funcionários; os restantes ficam em leitura.
   const isViewingOther = selectedFuncionario !== utilizadorId
+  const podeEditar = !isViewingOther || isAdmin
 
   async function carregarJornada(funcionarioId: string) {
     setLoading(true)
@@ -127,13 +129,13 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
 
   // Cria a jornada do dia para o próprio utilizador (botão "Iniciar Jornada").
   async function iniciarJornada() {
-    if (isViewingOther) return
+    if (!podeEditar) return
     setLoading(true)
     try {
       const res = await fetch('/api/admin/jornadas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dia: hoje }),
+        body: JSON.stringify(isViewingOther ? { dia: hoje, funcionario_id: selectedFuncionario } : { dia: hoje }),
       })
       if (res.ok) {
         const j: Jornada = await res.json()
@@ -149,7 +151,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
 
   // Finaliza o dia de trabalho: termina a ação ativa (se houver) e marca o fim.
   async function finalizarJornada() {
-    if (!jornada || isViewingOther) return
+    if (!jornada || !podeEditar) return
     setFinalizando(true)
     try {
       if (acaoAtiva) {
@@ -185,7 +187,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
 
   // Reabre a jornada (caso tenha sido finalizada por engano).
   async function reabrirJornada() {
-    if (!jornada || isViewingOther) return
+    if (!jornada || !podeEditar) return
     setFinalizando(true)
     try {
       const res = await fetch('/api/admin/jornadas', {
@@ -199,6 +201,34 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
       }
     } finally {
       setFinalizando(false)
+    }
+  }
+
+  // Apaga a jornada inteira (e as ações).
+  async function apagarJornada() {
+    if (!jornada || !podeEditar) return
+    if (!confirm('Eliminar esta jornada inteira (e todas as ações do dia)? Esta ação não pode ser anulada.')) return
+    setFinalizando(true)
+    try {
+      const res = await fetch(`/api/admin/jornadas?id=${jornada.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setJornada(null); setAcoes([]); setAcaoAtiva(null)
+        if (mostrarHist) carregarHistorico()
+      }
+    } finally {
+      setFinalizando(false)
+    }
+  }
+
+  // Apaga uma ação concluída.
+  async function apagarAcao(a: Acao) {
+    if (!jornada || !podeEditar) return
+    if (!confirm('Eliminar esta ação?')) return
+    try {
+      const res = await fetch(`/api/admin/jornadas/${jornada.id}/acoes/${a.id}`, { method: 'DELETE' })
+      if (res.ok) setAcoes(prev => prev.filter(x => x.id !== a.id))
+    } catch {
+      // ignora
     }
   }
 
@@ -229,7 +259,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   }, [selectedFuncionario])
 
   async function iniciarAcao(tipo: TipoAcao) {
-    if (!jornada || acaoAtiva || isViewingOther) return
+    if (!jornada || acaoAtiva || !podeEditar) return
     setSaving(tipo)
     try {
       const res = await fetch(`/api/admin/jornadas/${jornada.id}/acoes`, {
@@ -248,7 +278,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   }
 
   async function finalizarAcao() {
-    if (!jornada || !acaoAtiva || isViewingOther) return
+    if (!jornada || !acaoAtiva || !podeEditar) return
     setSaving(acaoAtiva.tipo as TipoAcao)
     try {
       const res = await fetch(`/api/admin/jornadas/${jornada.id}/acoes/${acaoAtiva.id}`, {
@@ -401,12 +431,14 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         </div>
       )}
 
-      {/* Modo leitura badge */}
+      {/* Modo: admin a gerir outro funcionário vs leitura */}
       {isViewingOther && (
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl mb-5 text-xs font-medium"
-          style={{ background: '#f3f4f6', color: '#4b5563' }}>
+          style={{ background: podeEditar ? '#eff6ff' : '#f3f4f6', color: podeEditar ? '#1d4ed8' : '#4b5563' }}>
           <Eye size={13} />
-          Modo visualização — não pode registar ações por outro funcionário
+          {podeEditar
+            ? 'Estás a gerir a jornada deste funcionário (podes editar, apagar e adicionar).'
+            : 'Modo visualização — não pode registar ações por outro funcionário'}
         </div>
       )}
 
@@ -416,8 +448,8 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         </div>
       ) : (
         <>
-          {/* Sem registo hoje (a ver outro funcionário) — o histórico continua visível abaixo */}
-          {isViewingOther && !jornada && (
+          {/* Sem registo hoje e sem permissão de edição — só leitura */}
+          {!jornada && !podeEditar && (
             <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl mb-6"
               style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-sub)' }}>
               <CalendarDays size={36} style={{ color: 'var(--text-3)', opacity: 0.35 }} />
@@ -425,15 +457,15 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
-          {/* Iniciar jornada — próprio utilizador, ainda sem jornada hoje */}
-          {!jornada && !isViewingOther && (
+          {/* Iniciar jornada — próprio utilizador OU admin a gerir outro */}
+          {!jornada && podeEditar && (
             <div className="rounded-2xl p-8 mb-6 flex flex-col items-center text-center"
               style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-sub)' }}>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: '#dbeafe' }}>
                 <PlayCircle size={24} style={{ color: 'var(--accent)' }} />
               </div>
               <p className="text-sm mb-5" style={{ color: 'var(--text-2)' }}>
-                Ainda não iniciaste a jornada de hoje.
+                {isViewingOther ? 'Este funcionário ainda não tem jornada hoje.' : 'Ainda não iniciaste a jornada de hoje.'}
               </p>
               <button
                 type="button"
@@ -495,7 +527,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                 </div>
               </div>
 
-              {!isViewingOther && (
+              {podeEditar && (
                 <>
                   <textarea
                     value={descricao}
@@ -546,8 +578,8 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
-          {/* Botões iniciar ação — só com jornada ativa (não finalizada) e para o próprio utilizador */}
-          {jornada && !jornada.fim && !acaoAtiva && !isViewingOther && (
+          {/* Botões iniciar ação — só com jornada ativa (não finalizada) e com permissão */}
+          {jornada && !jornada.fim && !acaoAtiva && podeEditar && (
             <div className="grid grid-cols-2 gap-3 mb-6">
               {(Object.entries(TIPO_META) as [TipoAcao, typeof TIPO_META[TipoAcao]][]).map(([tipo, m]) => {
                 const Icon = m.icon
@@ -657,15 +689,25 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
                                 <img src={a.imagem_url} alt="" className="mt-2 rounded-xl max-h-28 object-cover" />
                               </a>
                             )}
-                            {(!isViewingOther || isAdmin) && (
-                              <button
-                                type="button"
-                                onClick={() => abrirEdicao(a)}
-                                className="mt-1.5 text-xs font-medium"
-                                style={{ color: 'var(--accent)' }}
-                              >
-                                {a.descricao || a.imagem_url ? 'Editar comentário / foto' : 'Adicionar comentário / foto'}
-                              </button>
+                            {podeEditar && (
+                              <div className="flex items-center gap-4 mt-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => abrirEdicao(a)}
+                                  className="text-xs font-medium"
+                                  style={{ color: 'var(--accent)' }}
+                                >
+                                  {a.descricao || a.imagem_url ? 'Editar comentário / foto' : 'Adicionar comentário / foto'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => apagarAcao(a)}
+                                  className="inline-flex items-center gap-1 text-xs font-medium"
+                                  style={{ color: '#dc2626' }}
+                                >
+                                  <Trash2 size={12} /> Apagar
+                                </button>
+                              </div>
                             )}
                           </>
                         )}
@@ -677,18 +719,31 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
             </div>
           )}
 
-          {/* Finalizar dia de trabalho */}
-          {jornada && !jornada.fim && !isViewingOther && (
-            <button
-              type="button"
-              onClick={finalizarJornada}
-              disabled={finalizando}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold mb-6"
-              style={{ background: '#dc2626', color: '#fff', opacity: finalizando ? 0.7 : 1 }}
-            >
-              {finalizando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              Finalizar Jornada de Trabalho
-            </button>
+          {/* Ações da jornada: finalizar o dia e/ou apagar a jornada */}
+          {jornada && podeEditar && (
+            <div className="flex flex-col gap-2 mb-6">
+              {!jornada.fim && (
+                <button
+                  type="button"
+                  onClick={finalizarJornada}
+                  disabled={finalizando}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold"
+                  style={{ background: '#16a34a', color: '#fff', opacity: finalizando ? 0.7 : 1 }}
+                >
+                  {finalizando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                  Finalizar Jornada de Trabalho
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={apagarJornada}
+                disabled={finalizando}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', opacity: finalizando ? 0.7 : 1 }}
+              >
+                <Trash2 size={15} /> Apagar jornada
+              </button>
+            </div>
           )}
 
           {/* Histórico */}

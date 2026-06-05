@@ -107,3 +107,30 @@ export async function PATCH(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
+
+// DELETE — eliminar uma jornada inteira (e as suas ações). Admin ou o próprio.
+export async function DELETE(req: NextRequest) {
+  const utilizador = await getUtilizador()
+  if (!utilizador) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const id = new URL(req.url).searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 })
+
+  const supabase = await createAdminClient()
+  const { data: jornada } = await supabase
+    .from('maint_jornadas')
+    .select('funcionario_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!jornada) return NextResponse.json({ error: 'Jornada não encontrada' }, { status: 404 })
+  if (utilizador.cargo !== 'admin' && jornada.funcionario_id !== utilizador.id) {
+    return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+  }
+
+  // Apagar as ações primeiro (caso a FK não seja em cascade) e depois a jornada.
+  await supabase.from('maint_acoes').delete().eq('jornada_id', id)
+  const { error } = await supabase.from('maint_jornadas').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
