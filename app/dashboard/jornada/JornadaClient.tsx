@@ -95,6 +95,9 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   // adicionar) as jornadas de outros funcionários; os restantes ficam em leitura.
   const isViewingOther = selectedFuncionario !== utilizadorId
   const podeEditar = !isViewingOther || isAdmin
+  // Quando se está a gerir uma jornada antiga (do histórico) em vez da de hoje.
+  const isHistorica = !!jornada && jornada.dia !== hoje
+  const displayDia = jornada ? jornada.dia : hoje
 
   async function carregarJornada(funcionarioId: string) {
     setLoading(true)
@@ -179,6 +182,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         const j: Jornada = await res.json()
         setJornada(j)
         setAcaoAtiva(null)
+        if (mostrarHist) carregarHistorico()
       }
     } finally {
       setFinalizando(false)
@@ -198,6 +202,7 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
       if (res.ok) {
         const j: Jornada = await res.json()
         setJornada(j)
+        if (mostrarHist) carregarHistorico()
       }
     } finally {
       setFinalizando(false)
@@ -218,6 +223,23 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
     } finally {
       setFinalizando(false)
     }
+  }
+
+  // Abre uma jornada do histórico no topo para gestão completa
+  // (finalizar/reabrir, editar/apagar/adicionar ações, apagar a jornada).
+  async function gerirJornada(j: Jornada) {
+    cancelarEdicao()
+    setJornada(j)
+    setAcaoAtiva(null)
+    setDescricao(''); setImagemUrl('')
+    await carregarAcoes(j.id)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Volta a mostrar a jornada de hoje.
+  function voltarAHoje() {
+    carregarJornada(selectedFuncionario)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Apaga uma ação concluída.
@@ -409,9 +431,19 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)', fontFamily: 'Red Hat Display' }}>
           Jornada de Trabalho
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>
-          {new Date(hoje + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        <p className="text-sm mt-1 capitalize" style={{ color: 'var(--text-2)' }}>
+          {new Date(displayDia + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
+        {isHistorica && (
+          <button
+            type="button"
+            onClick={voltarAHoje}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl"
+            style={{ background: 'var(--bg-card)', color: 'var(--accent)', border: '1px solid var(--border-sub)' }}
+          >
+            ← Voltar à jornada de hoje
+          </button>
+        )}
       </div>
 
       {/* Admin selector */}
@@ -798,6 +830,16 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
 
                         {isOpen && (
                           <div className="border-t divide-y" style={{ borderColor: 'var(--border-sub)' }}>
+                            {podeEditar && (
+                              <button
+                                type="button"
+                                onClick={() => gerirJornada(j)}
+                                className="w-full flex items-center justify-center gap-2 px-5 py-3 text-xs font-semibold"
+                                style={{ color: 'var(--accent)', background: 'var(--bg-card)' }}
+                              >
+                                <PlayCircle size={14} /> Gerir esta jornada (finalizar · editar · apagar)
+                              </button>
+                            )}
                             {acs.length === 0 ? (
                               <p className="text-sm text-center py-6" style={{ color: 'var(--text-3)' }}>Sem ações registadas</p>
                             ) : acs.map(a => {
