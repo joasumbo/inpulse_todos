@@ -69,6 +69,14 @@ export default function ServicosClient({ servicos: inicial, lojas, equipas, util
       }
       return true
     })
+    // Ordenar por data prevista (mais próxima primeiro); sem data fica no fim.
+    .sort((a, b) => {
+      const da = a.data_prevista, db = b.data_prevista
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
+      return da < db ? -1 : da > db ? 1 : 0
+    })
   }, [lista, pesquisa, filtroEquipa, filtroPrio, filtroEstado, filtroLoja, view])
 
   const total     = lista.length
