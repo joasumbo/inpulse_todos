@@ -112,9 +112,10 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
       // Ao ver outro funcionário, mostrar logo o histórico (as jornadas dele
       // estão quase sempre em dias anteriores, não em "hoje").
       if (isOutro) setMostrarHist(true)
-      const url = isOutro
-        ? `/api/admin/jornadas?funcionario_id=${funcionarioId}`
-        : '/api/admin/jornadas'
+      // IMPORTANTE: filtrar SEMPRE pelo funcionário em questão. Um admin recebe
+      // todas as jornadas se não filtrar, e o find(dia) agarrava a de OUTRO
+      // funcionário — misturando jornadas e ações entre utilizadores.
+      const url = `/api/admin/jornadas?funcionario_id=${funcionarioId}`
       let j: Jornada | null = null
       const res = await fetch(url)
       if (res.ok) {
@@ -387,9 +388,9 @@ export default function JornadaClient({ utilizadorId, cargo, funcionarios }: Pro
   async function carregarHistorico() {
     setLoadingHist(true)
     try {
-      const url = isAdmin && isViewingOther
-        ? `/api/admin/jornadas?funcionario_id=${selectedFuncionario}`
-        : '/api/admin/jornadas'
+      // Mostra apenas o histórico do funcionário selecionado (nunca de todos),
+      // para não misturar jornadas de utilizadores diferentes.
+      const url = `/api/admin/jornadas?funcionario_id=${selectedFuncionario}`
       const res = await fetch(url)
       if (!res.ok) return
       const data = await res.json()
